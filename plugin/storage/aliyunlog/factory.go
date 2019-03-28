@@ -38,6 +38,7 @@ type Factory struct {
 
 	primaryConfig config.LogstoreBuilder
 	client        sls.ClientInterface
+	depClient     sls.ClientInterface
 	spanProject   string
 	spanLogstore  string
 	depProject    string
@@ -71,12 +72,15 @@ func (f *Factory) Initialize(metricsFactory metrics.Factory, logger *zap.Logger)
 		return err
 	}
 
-	// TODO Create depLogstore in future
-	//depLogstore, err := f.primaryConfig.NewLogstore(config.DependencyType)
-	//if err != nil {
-	//	return err
-	//}
-	//f.depLogstore = depLogstore
+	if f.Options.GetPrimary().DependencyLogstore == "" {
+		return nil
+	}
+
+	f.logger.Info("Try to create dependency client")
+	f.depClient, f.depProject, f.depLogstore, err = f.primaryConfig.NewClient(config.DependencyType)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -107,7 +111,16 @@ func (f *Factory) CreateSpanWriter() (spanstore.Writer, error) {
 // CreateDependencyReader implements storage.Factory
 func (f *Factory) CreateDependencyReader() (dependencystore.Reader, error) {
 	return logDepStore.NewDependencyStore(
-		f.client,
+		f.depClient,
+		f.depProject,
+		f.depLogstore,
+		f.logger), nil
+}
+
+// CreateDependencyWriter create a dependency writer for sls
+func (f *Factory) CreateDependencyWriter() (dependencystore.Writer, error) {
+	return logDepStore.NewDependencyStore(
+		f.depClient,
 		f.depProject,
 		f.depLogstore,
 		f.logger), nil
