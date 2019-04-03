@@ -77,7 +77,7 @@ func (ls *LogStorage) QuerySpans(from, to time.Time, processFunc func(logs []map
 			return errors.Wrap(err, "Callback process span failed")
 		}
 		curCount += resp.Count
-		if curCount == count {
+		if curCount >= count {
 			break
 		}
 		offset += resp.Count

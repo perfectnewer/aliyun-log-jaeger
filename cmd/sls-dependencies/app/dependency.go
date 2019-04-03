@@ -14,6 +14,7 @@ import (
 
 const (
 	fromDataStr        = "from-date"
+	toDataStr          = "to-date"
 	defaultFromDataStr = "1970-01-01"
 )
 
@@ -23,16 +24,22 @@ func AddFlags(flags *flag.FlagSet) {
 		fromDataStr,
 		defaultFromDataStr,
 		"start date of traces to be processed. e.g. 2018-03-27")
+	flags.String(
+		toDataStr,
+		"",
+		"start date of traces to be processed. e.g. 2018-03-27")
 }
 
 // StartOption opetions for calculator
 type StartOption struct {
 	queryStartDateStr string
+	queryEndDateStr   string
 }
 
 // InitFromViper init options from viper
 func (o *StartOption) InitFromViper(v *viper.Viper) *StartOption {
 	o.queryStartDateStr = v.GetString(fromDataStr)
+	o.queryEndDateStr = v.GetString(toDataStr)
 	return o
 }
 
@@ -54,17 +61,31 @@ func NewDependencyCalculator(logStorage *LogStorage, dependencyWriter dependency
 	}
 }
 
+func (dc *DependencyCalculator) ParseDate(date string) (time.Time, error) {
+	return time.Parse("2006-01-02", date)
+}
+
 // Start start calculate dependency
 func (dc *DependencyCalculator) Start(option *StartOption) error {
 	dc.startOption = option
 
-	from, err := time.Parse("2006-01-02", option.queryStartDateStr)
+	from, err := dc.ParseDate(dc.startOption.queryStartDateStr)
 	if err != nil {
 		return err
 	}
 
+	var to time.Time
+	if dc.startOption.queryEndDateStr != "" {
+		to, err = dc.ParseDate(dc.startOption.queryEndDateStr)
+		if err != nil {
+			to = time.Now()
+		}
+	} else {
+		to = time.Now()
+	}
+
 	allTraces := make(map[string]*model.Trace)
-	if err := dc.spanLogStorage.QuerySpans(from, time.Now(), func(logs []map[string]string) error {
+	if err := dc.spanLogStorage.QuerySpans(from, to, func(logs []map[string]string) error {
 		traces, err := spanstore.ToTraces(logs)
 		if err != nil {
 			return err
